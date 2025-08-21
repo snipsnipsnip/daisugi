@@ -3,6 +3,9 @@ import { describe, it } from 'node:test';
 import { Ayamari, type AyamariErr } from '@daisugi/ayamari';
 import { urandom } from '@daisugi/kintsugi';
 
+// @ts-expect-error
+import FakePromise from 'promise-faker';
+
 import {
   Kado,
   type KadoConfig,
@@ -11,9 +14,13 @@ import {
 } from '../kado.js';
 
 const { errFn } = new Ayamari();
-const config: KadoConfig = { errFn, urandom };
 
-describe('Kado', () => {
+describe('Kado with default Promise', () =>
+  testCases({ errFn, urandom }));
+describe('Kado with custom Promise implementation', () =>
+  testCases({ errFn, urandom, promise: FakePromise }));
+
+function testCases(config: KadoConfig) {
   it('should have proper api', () => {
     assert.strictEqual(typeof Kado, 'function');
     assert.strictEqual(typeof Kado.value, 'function');
@@ -480,4 +487,4 @@ describe('Kado', () => {
       assert(a instanceof A);
     });
   });
-});
+}

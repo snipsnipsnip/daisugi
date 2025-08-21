@@ -57,6 +57,7 @@
     "@daisugi/kintsugi": "workspace:*",
     "@biomejs/biome": "^1.9.4",
     "@types/node": "^22.13.13",
+    "promise-faker": "^1.2.5",
     "tsc-watch": "^6.2.1",
     "typescript": "^5.8.2"
   }

@@ -3,12 +3,19 @@ import { describe, it } from 'node:test';
 import { Ayamari } from '@daisugi/ayamari';
 import { urandom } from '@daisugi/kintsugi';
 
+// @ts-expect-error
+import FakePromise from 'promise-faker';
+
 import { Kado, type KadoConfig } from '../kado.js';
 
 const { errFn } = new Ayamari();
-const config: KadoConfig = { errFn, urandom };
 
-describe('params', () => {
+describe('params with default Promise', () =>
+  testCases({ errFn, urandom }));
+describe('params with custom Promise implementation', () =>
+  testCases({ errFn, urandom, promise: FakePromise }));
+
+function testCases(config: KadoConfig) {
   it('should resolve properly manifest item', async () => {
     const { container } = new Kado(config);
     class A {
@@ -94,4 +101,4 @@ describe('params', () => {
     const a = await container.resolve<A>('A');
     assert.equal(a.b[0], 'foo');
   });
-});
+}

@@ -3,6 +3,15 @@ interface Class {
 }
 export type KadoToken = string | symbol | number;
 export type KadoScope = 'Transient' | 'Singleton';
+export interface KadoPromiseConstructor
+  extends PromiseConstructorLike {
+  all<T extends readonly unknown[] | []>(
+    values: T,
+  ): PromiseLike<{
+    -readonly [P in keyof T]: Awaited<T[P]>;
+  }>;
+  resolve<T>(value: T): PromiseLike<Awaited<T>>;
+}
 export interface KadoManifestItem {
   token?: KadoToken;
   useClass?: Class;
@@ -17,7 +26,7 @@ export type KadoParam = KadoToken | KadoManifestItem;
 interface KadoContainerItem {
   manifestItem: KadoManifestItem;
   checkedForCircularDep: boolean;
-  instance: any;
+  instance: null | PromiseLike<any>;
 }
 type KadoTokenToContainerItem = Map<
   KadoToken,
@@ -50,20 +59,26 @@ export interface KadoConfig {
    * Generates tokens for anonymous registrations (conforms to `@daisugi/kintsugi`)
    */
   urandom: () => KadoToken;
+  /**
+   * Promise constructor to specify custom implementation. Defaults to the global `Promise`.
+   */
+  promise?: KadoPromiseConstructor;
 }
 
 export class Container {
   #tokenToContainerItem: KadoTokenToContainerItem;
   #errFn: KadoErrorFactory;
   #urandom: () => KadoToken;
+  #promise: KadoPromiseConstructor;
 
   constructor(config: KadoConfig) {
     this.#tokenToContainerItem = new Map();
     this.#errFn = config.errFn;
     this.#urandom = config.urandom;
+    this.#promise = config.promise ?? Promise;
   }
 
-  async resolve<T>(token: KadoToken): Promise<T> {
+  resolve<T>(token: KadoToken): PromiseLike<T> {
     const containerItem =
       this.#tokenToContainerItem.get(token);
     if (containerItem === undefined) {
@@ -78,42 +93,51 @@ export class Container {
     if (containerItem.instance) {
       return containerItem.instance;
     }
+    const promise = this.#promise;
     let resolve: ((value: any) => void) | undefined;
     if (manifestItem.scope !== Kado.scope.Transient) {
-      containerItem.instance = new Promise((_resolve) => {
+      containerItem.instance = new promise((_resolve) => {
         resolve = _resolve;
       });
     }
-    let paramsInstances = null;
+    let paramsPromise: PromiseLike<unknown[]> | undefined;
     if (manifestItem.params) {
       this.#checkForCircularDep(containerItem);
-      paramsInstances = await Promise.all(
+      paramsPromise = promise.all(
         manifestItem.params.map(
           this.#resolveParam.bind(this),
         ),
       );
     }
-    let instance: any;
+    let instance: PromiseLike<T>;
     if (manifestItem.useFn) {
-      instance = paramsInstances
-        ? manifestItem.useFn(...paramsInstances)
-        : manifestItem.useFn();
+      const fn = manifestItem.useFn;
+      instance = paramsPromise
+        ? paramsPromise.then((args) => fn(...args) as T)
+        : promise.resolve(fn() as T);
     } else if (manifestItem.useFnByContainer) {
-      instance = manifestItem.useFnByContainer(this);
+      instance = promise.resolve(
+        manifestItem.useFnByContainer(this) as T,
+      );
     } else if (manifestItem.useClass) {
-      instance = paramsInstances
-        ? new manifestItem.useClass(...paramsInstances)
-        : new manifestItem.useClass();
+      const ctor = manifestItem.useClass;
+      instance = paramsPromise
+        ? paramsPromise.then(
+            (args) => new ctor(...args) as T,
+          )
+        : promise.resolve(new ctor() as T);
+    } else {
+      throw this.#errFn.NotFound(
+        `No instantiation strategy found for token: "${token.toString()}".`,
+      );
     }
     if (manifestItem.scope === Kado.scope.Transient) {
       return instance;
     }
-    // biome-ignore lint/style/noNonNullAssertion: We know that `resolve` is defined if the scope is not transient.
-    resolve!(instance);
-    return containerItem.instance;
+    return instance.then(resolve).then((_) => instance);
   }
 
-  async #resolveParam(param: KadoParam) {
+  #resolveParam(param: KadoParam) {
     const token =
       typeof param === 'object'
         ? this.#registerItem(param)
