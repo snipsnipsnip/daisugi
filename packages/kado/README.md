@@ -14,7 +14,7 @@ This project is part of the [@daisugi](https://github.com/daisugiland/daisugi) m
 
 - 💡 Minimal size overhead ([see details](https://bundlephobia.com/result?p=@daisugi/kado))
 - ⚡️ Written in TypeScript
-- 📦 Uses only trusted dependencies
+- 📦 Zero dependencies (while [`@daisugi/ayamari`](https://www.npmjs.com/package/@daisugi/ayamari) and [`@daisugi/kintsugi`](https://www.npmjs.com/package/@daisugi/kintsugi) integrate seamlessly)
 - 🔨 Powerful and agnostic to your code
 - 🧪 Well-tested
 - 🤝 Used in production
@@ -44,8 +44,11 @@ pnpm install @daisugi/kado
 
 ```js
 import { Kado } from '@daisugi/kado';
+import { Ayamari } from '@daisugi/ayamari';
+import { urandom } from '@daisugi/kintsugi';
 
-const { container } = new Kado();
+const { errFn } = new Ayamari();
+const { container } = new Kado({ errFn, urandom });
 
 class Foo {
   constructor(bar) {
@@ -136,6 +139,19 @@ Kado was created to address limitations found in other IoC libraries. If these r
 ---
 
 ## 📜 API
+
+### `new Kado(config)`
+
+Initializes the library with dependencies required for Kado to work.
+
+```js
+import { Kado } from '@daisugi/kado';
+import { Ayamari } from '@daisugi/ayamari';
+import { urandom } from '@daisugi/kintsugi';
+
+const { errFn } = new Ayamari();
+const { container } = new Kado({ errFn, urandom });
+```
 
 ### `#register(manifestItems)`
 
@@ -358,9 +374,15 @@ import {
   type KadoContainer,
   type KadoToken,
   type KadoScope,
+  type KadoConfig,
 } from '@daisugi/kado';
+import { Ayamari } from '@daisugi/ayamari';
+import { urandom } from '@daisugi/kintsugi';
 
-const { container } = new Kado();
+const { errFn } = new Ayamari();
+const kadoConfig: KadoConfig = { errFn, urandom };
+
+const { container } = new Kado(kadoConfig);
 
 class Foo {}
 

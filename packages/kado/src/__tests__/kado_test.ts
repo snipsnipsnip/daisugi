@@ -1,12 +1,17 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { Ayamari, type AyamariErr } from '@daisugi/ayamari';
+import { urandom } from '@daisugi/kintsugi';
 
 import {
   Kado,
+  type KadoConfig,
   type KadoContainer,
   type KadoManifestItem,
 } from '../kado.js';
+
+const { errFn } = new Ayamari();
+const config: KadoConfig = { errFn, urandom };
 
 describe('Kado', () => {
   it('should have proper api', () => {
@@ -15,7 +20,7 @@ describe('Kado', () => {
     assert.strictEqual(typeof Kado.map, 'function');
     assert.strictEqual(typeof Kado.flatMap, 'function');
 
-    const { container } = new Kado();
+    const { container } = new Kado(config);
 
     assert.strictEqual(
       typeof container.resolve,
@@ -30,14 +35,14 @@ describe('Kado', () => {
   });
 
   it('#get()', () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     const manifestItem = { token: 'a' };
     container.register([manifestItem]);
     assert.equal(container.get('a'), manifestItem);
   });
 
   it('useClass', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
 
     class B {
       foo = 'foo';
@@ -60,7 +65,7 @@ describe('Kado', () => {
   });
 
   it('useValue', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
 
     const b = Symbol('B');
 
@@ -79,7 +84,7 @@ describe('Kado', () => {
   });
 
   it('useValue false', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
 
     const b = Symbol('B');
 
@@ -98,7 +103,7 @@ describe('Kado', () => {
   });
 
   it('should resolve Singleton only once', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     let count = 0;
     container.register([
       {
@@ -119,7 +124,7 @@ describe('Kado', () => {
   });
 
   it('useClass Transient', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     let count = 0;
     container.register([
       {
@@ -141,7 +146,7 @@ describe('Kado', () => {
   });
 
   it('nested scope Transient', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
 
     class B {}
 
@@ -166,7 +171,7 @@ describe('Kado', () => {
 
   describe('useFnByContainer', () => {
     it('should resolve properly the container', async () => {
-      const { container } = new Kado();
+      const { container } = new Kado(config);
       async function useFnByContainer(c: KadoContainer) {
         const b = await c.resolve('B');
         return b;
@@ -183,7 +188,7 @@ describe('Kado', () => {
     });
 
     it('should resolve properly the class', async () => {
-      const { container } = new Kado();
+      const { container } = new Kado(config);
 
       async function useFnByContainer(c: KadoContainer) {
         if ((await c.resolve('B')) === 'foo') {
@@ -206,7 +211,7 @@ describe('Kado', () => {
     });
 
     it('should return the list of manifest items', async () => {
-      const { container } = new Kado();
+      const { container } = new Kado(config);
 
       function useFnByContainer(c: KadoContainer) {
         return c.list();
@@ -227,7 +232,7 @@ describe('Kado', () => {
   });
 
   it('useFn', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     function useFn(b: string) {
       if (b === 'foo') {
         return Math.random();
@@ -245,7 +250,7 @@ describe('Kado', () => {
   });
 
   it('async useFn', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     class A {
       get() {
         return 'a';
@@ -279,7 +284,7 @@ describe('Kado', () => {
   });
 
   it('useFn Transient', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
 
     function useFn(b: string) {
       if (b === 'foo') {
@@ -307,7 +312,7 @@ describe('Kado', () => {
   });
 
   it('useFnByContainer Transient', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
 
     function useFnByContainer() {
       return Math.random();
@@ -328,7 +333,7 @@ describe('Kado', () => {
   });
 
   it('#list()', () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
 
     container.register([{ token: 'a', useValue: 'text' }]);
 
@@ -340,7 +345,7 @@ describe('Kado', () => {
   });
 
   it('#list() with symbol keys', () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     const token = Symbol('a');
     container.register([{ token, useValue: 'text' }]);
 
@@ -353,7 +358,7 @@ describe('Kado', () => {
 
   describe('when you try to resolve unregistered token', () => {
     it('should throw an err', async () => {
-      const { container } = new Kado();
+      const { container } = new Kado(config);
 
       try {
         await container.resolve('a');
@@ -376,7 +381,7 @@ describe('Kado', () => {
 
   describe('when you try to resolve deep unregistered token', () => {
     it('should throw an err', async () => {
-      const { container } = new Kado();
+      const { container } = new Kado(config);
 
       container.register([
         { token: 'a', useFn() {}, params: ['b'] },
@@ -403,7 +408,7 @@ describe('Kado', () => {
 
   describe('when you try to make a circular injection', () => {
     it('should throw an err', async () => {
-      const { container } = new Kado();
+      const { container } = new Kado(config);
 
       class C {
         constructor(public a: A) {}
@@ -444,7 +449,7 @@ describe('Kado', () => {
 
   describe('when no circular injection detected', () => {
     it('should not throw an err', async () => {
-      const { container } = new Kado();
+      const { container } = new Kado(config);
 
       class C {
         constructor(public b: B) {}

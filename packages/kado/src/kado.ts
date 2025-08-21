@@ -1,8 +1,3 @@
-import { Ayamari } from '@daisugi/ayamari';
-import { urandom } from '@daisugi/kintsugi';
-
-const { errFn } = new Ayamari();
-
 interface Class {
   new (...args: any[]): unknown;
 }
@@ -30,18 +25,49 @@ type KadoTokenToContainerItem = Map<
 >;
 export type KadoContainer = Container;
 
+/**
+ * Required dependencies for Kado to work
+ */
+export interface KadoConfig {
+  /**
+   * Creates Error to throw on error conditions (conforms to `@daisugi/ayamari`)
+   */
+  errFn: KadoErrorFactory;
+  /**
+   * Generates tokens for anonymous registrations (conforms to `@daisugi/kintsugi`)
+   */
+  urandom: () => KadoToken;
+}
+/**
+ * Creates Error to throw that may occur when resolving (conforms to `@daisugi/ayamari`)
+ */
+export interface KadoErrorFactory {
+  /**
+   * Creates error to throw when given token does not correspond to registered manifests
+   */
+  NotFound(msg: string): Error;
+  /**
+   * Creates error to throw when dependencies are in cycle
+   */
+  CircularDependencyDetected(msg: string): Error;
+}
+
 export class Container {
   #tokenToContainerItem: KadoTokenToContainerItem;
+  #errFn: KadoErrorFactory;
+  #urandom: () => KadoToken;
 
-  constructor() {
+  constructor(config: KadoConfig) {
     this.#tokenToContainerItem = new Map();
+    this.#errFn = config.errFn;
+    this.#urandom = config.urandom;
   }
 
   async resolve<T>(token: KadoToken): Promise<T> {
     const containerItem =
       this.#tokenToContainerItem.get(token);
     if (containerItem === undefined) {
-      throw errFn.NotFound(
+      throw this.#errFn.NotFound(
         `Attempted to resolve unregistered dependency token: "${token.toString()}".`,
       );
     }
@@ -102,7 +128,7 @@ export class Container {
   }
 
   #registerItem(manifestItem: KadoManifestItem): KadoToken {
-    const token = manifestItem.token || urandom();
+    const token = manifestItem.token || this.#urandom();
     this.#tokenToContainerItem.set(token, {
       manifestItem: Object.assign(manifestItem, { token }),
       checkedForCircularDep: false,
@@ -121,7 +147,7 @@ export class Container {
     const containerItem =
       this.#tokenToContainerItem.get(token);
     if (containerItem === undefined) {
-      throw errFn.NotFound(
+      throw this.#errFn.NotFound(
         `Attempted to get unregistered dependency token: "${token.toString()}".`,
       );
     }
@@ -143,7 +169,7 @@ export class Container {
       const chainOfTokens = tokens
         .map((token) => `"${token.toString()}"`)
         .join(' ➡️ ');
-      throw errFn.CircularDependencyDetected(
+      throw this.#errFn.CircularDependencyDetected(
         `Attempted to resolve circular dependency: ${chainOfTokens} 🔄 "${token.toString()}".`,
       );
     }
@@ -175,8 +201,8 @@ export class Kado {
   };
   container: KadoContainer;
 
-  constructor() {
-    this.container = new Container();
+  constructor(config: KadoConfig) {
+    this.container = new Container(config);
   }
 
   static value(value: unknown): KadoManifestItem {

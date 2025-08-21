@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { Ayamari } from '@daisugi/ayamari';
+import { urandom } from '@daisugi/kintsugi';
 
-import { Kado } from '../kado.js';
+import { Kado, type KadoConfig } from '../kado.js';
+
+const { errFn } = new Ayamari();
+const config: KadoConfig = { errFn, urandom };
 
 describe('params', () => {
   it('should resolve properly manifest item', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     class A {
       constructor(
         public b: string,
@@ -35,7 +40,7 @@ describe('params', () => {
   });
 
   it('should resolve properly Kado.value', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     class A {
       constructor(public b: string) {
         this.b = b;
@@ -53,7 +58,7 @@ describe('params', () => {
   });
 
   it('should resolve properly Kado.map', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     class A {
       constructor(public b: string) {
         this.b = b;
@@ -72,7 +77,7 @@ describe('params', () => {
   });
 
   it('should resolve properly Kado.flatMap', async () => {
-    const { container } = new Kado();
+    const { container } = new Kado(config);
     class A {
       constructor(public b: string) {
         this.b = b;
